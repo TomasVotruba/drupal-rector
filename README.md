@@ -115,6 +115,10 @@ This is more granular than the `Drupal10SetList::DRUPAL_10` set. Since Drupal 10
 >     ->withComposerBased(phpunit: true, symfony: true, twig: true)
 >     ->withSets([Drupal10SetList::DRUPAL_10]);
 > ```
+>
+> On a Drupal 11 site that means Symfony 7 rules, which break code that still
+> has to run on Drupal 10. If your module supports both, register the individual
+> upstream rules you need instead of the whole composer-based set.
 
 ### Composer-based sets (automatic version selection)
 
@@ -127,10 +131,13 @@ return RectorConfig::configure()
 ```
 
 `DrupalSetList::COMPOSER_BASED` registers every Drupal 10 and later rule at
-once, each one bound to the exact `drupal/core` version its deprecation was
-introduced in — `>=11.3.0`, `>=10.2.0`, and so on. Rector activates only the
-rules whose constraint the installed core satisfies, so a site on 11.2 gets the
-`>=10.0.0` … `>=11.2.0` rules and never a later minor's. Because the installed version is
+once, each one bound to the `drupal/core` versions its deprecation applies to:
+from the version it was introduced in up to, but not including, the major after
+the one the API is removed in — `>=11.4.0 <14.0.0` for a deprecation removed in
+13.0.0. Rector activates only the rules whose constraint the installed core
+satisfies, so a site on 11.2 gets every rule whose deprecation landed in 11.2 or
+earlier and whose removal is not more than one major behind it, and never a
+later minor's. Because the installed version is
 known exactly, the otherwise opt-in *breaking* renames (whose replacement only
 exists from a given minor onward) are included — they cannot fatal on a core
 that is guaranteed to have the replacement.
@@ -144,8 +151,11 @@ vendor/bin/rector composer-based
 
 A rule that takes no configuration states its version on the rule class instead,
 through Rector's `ComposerPackageConstraintInterface`, so it is skipped on a core
-below it too. That filter is global, not per set: those rules stay off on an
-older core even when you load a `Drupal11SetList` set by hand.
+outside it too: below the lower bound, past the upper bound, or when `drupal/core`
+is installed as a branch version such as `dev-main`. That filter is global, not
+per set: those rules stay off even when you load a `Drupal11SetList` set by hand.
+Configurable rules carry their bound only in the composer-based set, so the
+per-minor sets run them on any core.
 
 The Drupal 8 and 9 rules are not part of this set. Every API they rewrite was
 removed by Drupal 10 or 11, so on a supported core they have nothing left to

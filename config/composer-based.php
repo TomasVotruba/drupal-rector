@@ -124,8 +124,12 @@ use Rector\Config\RectorConfig;
 use Rector\Renaming\Rector\Name\RenameClassRector;
 
 /**
- * Every drupal-rector rule, bound to the exact `drupal/core` version its
- * deprecation was introduced in.
+ * Every Drupal 10 and later drupal-rector rule, bound to the `drupal/core`
+ * versions its deprecation applies to: from the version the deprecation was
+ * introduced in (`>=11.4.0`) up to, but not including, the major after the one
+ * the API is removed in (`<14.0.0` for a removal in 13.0.0). Rector reads
+ * source, not runtime, so a call that is already gone from core is still worth
+ * rewriting; the extra major covers that.
  *
  * A rule that takes configuration is registered with
  * ruleWithConfigurationComposerVersionBound(), which states the version here.
@@ -147,29 +151,40 @@ use Rector\Renaming\Rector\Name\RenameClassRector;
  * landed in, so those sets apply them on any core from then on.
  *
  * Instead of picking set lists by hand, this set lets Rector pick the rules from
- * the installed `drupal/core` version: a site on 11.2 gets the rules bound to
- * `>=10.0.0` through `>=11.2.0` and never a later minor's. Because the installed
- * core is known exactly, the otherwise opt-in "breaking" renames (whose
- * replacement symbol only exists from a given minor onward) are safe to include
- * — they cannot fatal on a core that is guaranteed to have the replacement.
+ * the installed `drupal/core` version: a site on 11.2 gets every rule whose
+ * deprecation landed in 11.2 or earlier and whose removal is not more than one
+ * major behind it, and never a later minor's. Because the installed core is
+ * known exactly, the otherwise opt-in "breaking" renames (whose replacement
+ * symbol only exists from a given minor onward) are safe to include — they
+ * cannot fatal on a core that is guaranteed to have the replacement.
  *
  * Usage:
  *
  *     return RectorConfig::configure()
  *         ->withComposerBased(drupal: true);
  *
- * The Symfony and PHPUnit version sets that the per-minor Drupal configs pull in
- * are deliberately not repeated here: those packages ship their own
- * composer-based sets, bound to their own installed version, which is more
- * accurate than inferring them from the Drupal minor. Add
- * `symfony: true, phpunit: true` to the call above to get those too.
+ * Drupal rules only. Rector's own Symfony, PHPUnit and Twig sets are not
+ * included: since Rector 2.6.2 they exist only as composer-based sets bound to
+ * the installed Symfony/PHPUnit/Twig version, not the Drupal one. On a Drupal 11
+ * site `symfony: true` therefore applies Symfony 7 rules, which breaks code
+ * that still has to run on Drupal 10. Register the individual rules you want
+ * instead.
  *
  * The explicit \DrupalRector\Set\Drupal10SetList and
- * \DrupalRector\Set\Drupal11SetList sets stay the way to pick rules by hand. Note
- * that the rules bonded through ComposerPackageConstraintInterface are filtered
- * by the installed core there as well — that filter is global, not per set — so
- * those sets no longer fire every rule on an older core. The Drupal 8 and 9 rule
- * classes carry no upper bound, so their sets are never filtered on a newer one.
+ * \DrupalRector\Set\Drupal11SetList sets stay the way to pick rules by hand.
+ * Two kinds of rule behave differently there:
+ * - the rules bound through ComposerPackageConstraintInterface (plain rules) are
+ *   filtered by the installed core everywhere, because that filter is global,
+ *   not per set. They are skipped below their lower bound, past their upper
+ *   bound, and when `drupal/core` is missing or installed as a branch version
+ *   such as `dev-main`;
+ * - the configurable rules (BC-wrapping ones included) carry their bound only
+ *   in this set, so the per-minor sets run them on any core.
+ * The Drupal 8 and 9 rule classes carry no upper bound, so their sets are never
+ * filtered on a newer one.
+ *
+ * `vendor/bin/rector composer-based` lists each bound rule and whether the
+ * installed core activates it.
  *
  * @see \DrupalRector\Set\DrupalSetList::COMPOSER_BASED
  */
